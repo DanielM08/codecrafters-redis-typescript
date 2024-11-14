@@ -47,8 +47,6 @@ function parseRESPCommand(data: Buffer): RedisCommand {
     }
   }
 
-  console.log(commandArguments)
-
   if(commandArguments.length === 0){
     // TODO: improve error handling
     throw new Error('Invalid command');
@@ -63,6 +61,7 @@ function parseRESPCommand(data: Buffer): RedisCommand {
   };
 }
 
+const memory: Record<string, string[]> = {}
 
 const server: net.Server = net.createServer((connection: net.Socket) => {  
   clients.add(connection);
@@ -70,15 +69,27 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
   connection.on('data', (data) => {
     const command = parseRESPCommand(data);
 
+    let response;
+
     switch (command.name.toLowerCase()) {
       case 'echo': 
-        const resp = command.arguments.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('')
-        connection.write(`${resp}`)
+        response = command.arguments.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('');
         break;
       case 'ping':
-        connection.write('+PONG\r\n')
+        response = '+PONG\r\n';
+        break;
+      case 'set': 
+        const keySet = command.arguments.splice(0, 1)[0];
+        memory[keySet] = command.arguments;
+        response = '+OK\r\n';
+        break;
+      case 'get':
+        const keyGet = command.arguments[0];
+        const item = memory[keyGet];
+        response = item ? item.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('') : '$-1\r\n';
         break;
     }
+    connection.write(`${response}`);
   });
 
   connection.on('end', () => {
