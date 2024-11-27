@@ -26,14 +26,30 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
         response = '+PONG\r\n';
         break;
       case 'set': 
-        const keySet = command.arguments.splice(0, 1)[0];
-        memory[keySet] = command.arguments;
-        response = '+OK\r\n';
+        const { keySet, optionsMap, value } = parseSetCommand(command);
+
+        let expirationTime = undefined 
+        
+        if(optionsMap?.px) {
+          expirationTime = new Date().getTime() + optionsMap.px;
+        } 
+
+        memory[keySet] = {
+          value,
+          expirationTime,
+        }
+        
+        response = OK_RESPONSE;
         break;
       case 'get':
         const keyGet = command.arguments[0];
         const item = memory[keyGet];
-        response = item ? item.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('') : '$-1\r\n';
+
+        if(!item || item.expirationTime && new Date().getTime() > item.expirationTime) {
+          response = NULL_RESPONSE;
+        } else {
+          response = item.value.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('');  
+        }
         break;
     }
     connection.write(`${response}`);
