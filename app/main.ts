@@ -10,6 +10,17 @@ const memory: Record<string, {
   expirationTime?: number,
 }> = {}
 
+let dir = '';
+let dbfilename = '';
+
+process.argv.forEach((arg) => {
+  if (arg === '--dir') {
+    dir = process.argv[process.argv.indexOf(arg) + 1];
+  } else if (arg === '--dbfilename') {
+    dbfilename = process.argv[process.argv.indexOf(arg) + 1];
+  }
+})
+
 const server: net.Server = net.createServer((connection: net.Socket) => {  
   clients.add(connection);
 
@@ -51,6 +62,19 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
           response = item.value.map(a => `${TypesMap.BulkString}${a.length}${CRLF}${a}${CRLF}`).join('');  
         }
         break;
+      case 'config': 
+        if(command.arguments[0] === 'GET') {
+          const configKey = command.arguments[1];
+          const baseResponse = `${TypesMap.Arrays}${2}${CRLF}${TypesMap.BulkString}${configKey.length}${CRLF}${configKey}${CRLF}`;
+          if(configKey === 'dir') {
+            response = `${baseResponse}${TypesMap.BulkString}${dir.length}${CRLF}${dir}${CRLF}`;
+          } else if(configKey === 'dbfilename') {
+            response = `${baseResponse}${TypesMap.BulkString}${dbfilename.length}${CRLF}${dbfilename}${CRLF}`;
+          } else {
+            response = NULL_RESPONSE;
+          }
+        }
+      
     }
     connection.write(`${response}`);
   });
